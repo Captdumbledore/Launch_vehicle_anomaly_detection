@@ -11,12 +11,17 @@ Full-featured Streamlit dashboard with:
 """
 
 import os
+import sys
 import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+
+# ── Add src/ to path for local imports ────────────────────────────────────
+BASE_DIR_INIT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(BASE_DIR_INIT, "src"))
 
 # ── Page config (must be first) ────────────────────────────────────────────
 st.set_page_config(
@@ -158,6 +163,70 @@ PLOTLY_THEME = dict(
     font_color="#8892b0",
     font_family="Inter",
 )
+
+# ── Auto-generate pipeline (runs on Streamlit Cloud if data missing) ──────
+@st.cache_resource
+def auto_generate_data():
+    """Run the full pipeline to create data and model if they don't exist."""
+    iso_results = os.path.join(BASE_DIR_INIT, "data", "iso_forest_results.csv")
+    if os.path.exists(iso_results):
+        return True  # Already have results, skip generation
+
+    try:
+        import joblib
+        from sklearn.ensemble import IsolationForest
+        from day1_generator import generate_telemetry
+        from day2_physics   import simulate_pressure, simulate_vibration
+        from anomalies      import inject_spike, inject_drift
+
+        data_dir  = os.path.join(BASE_DIR_INIT, "data")
+        model_dir = os.path.join(BASE_DIR_INIT, "models")
+        os.makedirs(data_dir,  exist_ok=True)
+        os.makedirs(model_dir, exist_ok=True)
+
+        np.random.seed(42)
+
+        # 1. Generate base telemetry
+        df_base = generate_telemetry()
+        df_base["fuel_pressure"] = simulate_pressure(df_base["time"].to_numpy())
+        df_base["vibration"]     = simulate_vibration(df_base["velocity"].to_numpy())
+        df_base.to_csv(os.path.join(data_dir, "train_normal.csv"), index=False)
+
+        # 2. Build test set with anomalies
+        df_test = df_base.copy()
+        fp_orig = df_test["fuel_pressure"].to_numpy().copy()
+        fp_corr = inject_spike(fp_orig, magnitude=300, probability=0.02)
+        df_test["fuel_pressure"] = fp_corr
+        spike_mask = ~np.isclose(fp_orig, fp_corr, rtol=0, atol=1e-10)
+
+        et_orig = df_test["engine_temp"].to_numpy().copy()
+        et_corr = inject_drift(et_orig, drift_factor=0.08)
+        df_test["engine_temp"] = et_corr
+        drift_mask = ~np.isclose(et_orig, et_corr, rtol=0, atol=1e-10)
+
+        df_test["is_anomaly"] = (spike_mask | drift_mask).astype(int)
+        df_test.to_csv(os.path.join(data_dir, "test_anomalies.csv"), index=False)
+
+        # 3. Train Isolation Forest on normal data
+        FEATURE_COLS_GEN = ["altitude", "velocity", "engine_temp", "fuel_pressure", "vibration"]
+        X_train = df_base[FEATURE_COLS_GEN].values
+        model = IsolationForest(n_estimators=100, contamination=0.05, random_state=42)
+        model.fit(X_train)
+        joblib.dump(model, os.path.join(model_dir, "iso_forest.pkl"))
+
+        # 4. Predict on test set
+        X_test       = df_test[FEATURE_COLS_GEN].values
+        raw_pred     = model.predict(X_test)
+        df_test["iso_prediction"] = np.where(raw_pred == -1, 1, 0)
+        df_test["iso_raw_score"]  = raw_pred
+        df_test.to_csv(iso_results, index=False)
+
+        return True
+    except Exception as e:
+        st.error(f"⚠️ Auto-generation failed: {e}")
+        return False
+
+auto_generate_data()
 
 # ── Data loader ────────────────────────────────────────────────────────────
 @st.cache_data

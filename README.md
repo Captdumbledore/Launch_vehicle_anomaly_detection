@@ -66,7 +66,7 @@ Launch_vehicle_anomaly_detection/
 
 ---
 
-## 🗓️ Development Roadmap
+## ✅ Development Roadmap
 
 ### Phase 1 — Data Simulation & Understanding (Days 1–3)
 | Day | File | Status | Description |
@@ -104,13 +104,14 @@ Launch_vehicle_anomaly_detection/
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/Captdumbledore/Launch_vehicle_anomaly_detection.git
-cd Launch_vehicle_anomaly_detection
+git clone https://github.com/tiz-dev/Launch_vehicle_anomaly_detection.git
+cd Launch_vehicle_anomaly_detection/launch_vehicle_anomaly_detection
 ```
 
 ### 2. Install dependencies
 ```bash
-pip install -r launch_vehicle_anomaly_detection/requirements.txt
+pip install -r requirements.txt
+pip install plotly
 ```
 
 ### 3. Launch the dashboard
@@ -156,6 +157,18 @@ python src/eval_zscore.py
 # Step 8 – Launch dashboard
 streamlit run app.py
 ```
+Opens at **http://localhost:8501**
+
+---
+
+## 📊 Dashboard Pages
+
+| Page | Description |
+|------|-------------|
+| 🏠 **Home** | Project overview, pipeline diagram, anomaly types |
+| 📊 **Dashboard** | Live metric cards, multi-channel telemetry viewer with anomaly overlays, channel distribution chart |
+| 🔍 **Anomaly Explorer** | Filterable anomaly event table, Z-score scatter plot |
+| 📈 **Model Comparison** | Side-by-side metrics, performance radar chart, confusion matrices |
 
 ---
 
@@ -248,7 +261,7 @@ pip install -r launch_vehicle_anomaly_detection/requirements.txt
 
 ---
 
-## 🚧 Constraints
+## 👥 Work Distribution
 
 - ✅ No advanced fluid dynamics or aerodynamics  
 - ✅ No complex sensor correlations  
